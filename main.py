@@ -41,14 +41,19 @@ def gestionar_venta_completa(data, headers):
         fecha_auto = datetime.now().strftime('%Y-%m-%d')
 
         with conn.cursor() as cursor:
-            # 1. INSERTAR CABECERA
-            # Usamos `N°_COMPR` con comillas invertidas porque tiene un carácter especial
+            # 1. INSERTAR CABECERA (Ahora incluyendo los 3 campos faltantes)
             sql_cab = """
                 INSERT INTO ventas_online 
-                (ASESOR, CLIENTE, TIPO_COMPROBANTE, `N°_COMPR`, FECHA, REGION, DISTRITO, FORMA_DE_PAGO, SALIDA_DE_PEDIDO) 
-                VALUES (%(asesor)s, %(cliente)s, %(tipo_comprobante)s, %(comprobante)s, %(fecha)s, %(region)s, %(distrito)s, %(forma_pago)s, %(salida)s)
+                (ASESOR, CLIENTE, TIPO_COMPROBANTE, `N°_COMPR`, FECHA, REGION, DISTRITO, 
+                 FORMA_DE_PAGO, SALIDA_DE_PEDIDO, LINEA, CANAL_VENTA, CLASIFICACION) 
+                VALUES (%(asesor)s, %(cliente)s, %(tipo_comprobante)s, %(comprobante)s, 
+                        %(fecha)s, %(region)s, %(distrito)s, %(forma_pago)s, %(salida)s,
+                        %(linea)s, %(canal)s, %(clasificacion)s)
             """
             
+            # Sacamos LINEA, CANAL y CLASIFICACION del primer elemento de los detalles
+            primer_detalle = detalles[0] if detalles else {}
+
             valores_cab = {
                 "asesor": cab.get("asesor"),
                 "cliente": cab.get("cliente"),
@@ -58,13 +63,15 @@ def gestionar_venta_completa(data, headers):
                 "region": cab.get("region"),
                 "distrito": cab.get("distrito"),
                 "forma_pago": cab.get("forma_pago"),
-                "salida": cab.get("salida")
+                "salida": cab.get("salida"),
+                # Agregamos estos 3:
+                "linea": primer_detalle.get("linea"),
+                "canal": primer_detalle.get("canal"),
+                "clasificacion": primer_detalle.get("clasificacion")
             }
             
             cursor.execute(sql_cab, valores_cab)
-            
-            # Obtenemos el ID generado por MySQL
-            id_generado = cursor.lastrowid 
+            id_generado = cursor.lastrowid
 
             # 2. INSERTAR DETALLES
             # IMPORTANTE: La columna se llama ID_VENTA (según tu imagen image_b76efc.png)
