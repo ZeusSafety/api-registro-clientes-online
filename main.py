@@ -65,6 +65,40 @@ def gestionar_venta_completa(data, headers):
             
             cursor.execute(sql_cab, valores_cab)
 
+            # INSERTAR DETALLES
+            sql_det = """
+                INSERT INTO detalle_ventas 
+                (LINEA, CANAL_VENTA, `N°_COMPR`, CODIGO_PRODUCTO, PRODUCTO, CANTIDAD, 
+                 UNIDAD_MEDIDA, PRECIO_VENTA, DELIVERY, TOTAL, ID_VENTA, CLASIFICACION, FECHA) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            
+            for it in detalles:
+                cursor.execute(sql_det, (
+                    it.get("linea"), 
+                    it.get("canal"), 
+                    cab.get("comprobante"), 
+                    it.get("codigo"), 
+                    it.get("producto"), 
+                    it.get("cantidad"), 
+                    it.get("unidad"), 
+                    it.get("precio"), 
+                    it.get("delivery"), 
+                    it.get("total"), 
+                    id_venta_generado, 
+                    it.get("clasificacion"), 
+                    fecha_auto
+                ))
+            
+        conn.commit()
+        return (json.dumps({"success": "Venta registrada correctamente", "id": id_venta_generado}), 200, headers)
+    except Exception as e:
+        if conn: conn.rollback()
+        logging.error(f"Error en Venta: {str(e)}")
+        return (json.dumps({"error": f"Fallo en venta: {str(e)}"}), 500, headers)
+    finally:
+        if conn: conn.close()
+
 # --- 2. LÓGICA DE CLIENTES (CRUD ORIGINAL) ---
 
 def extraer(request, headers):
