@@ -7,13 +7,10 @@ import os
 from datetime import datetime
 
 # --- CONFIGURACIÓN DE APIS EXTERNAS ---
-API_REGIONES = "https://cotizaciones2026-2946605267.us-central1.run.app/regiones"
-API_DISTRITOS = "https://cotizaciones2026-2946605267.us-central1.run.app/distritos"
 API_TOKEN_VERIFY = "https://api-verificacion-token-2946605267.us-central1.run.app"
 
 # --- FUNCIÓN DE CONEXIÓN A BASE DE DATOS ---
 def get_connection():
-    """Establece la conexión usando el socket de Cloud SQL."""
     try:
         conn = pymysql.connect(
             user="zeussafety-2024",
@@ -22,7 +19,6 @@ def get_connection():
             unix_socket="/cloudsql/stable-smithy-435414-m6:us-central1:zeussafety-2024",
             cursorclass=pymysql.cursors.DictCursor
         )
-        # Forzar zona horaria de Perú
         with conn.cursor() as cursor:
             cursor.execute("SET time_zone = '-05:00'")
         return conn
@@ -30,139 +26,108 @@ def get_connection():
         logging.error(f"Error conectando a la base de datos: {str(e)}")
         raise e
 
-# --- LÓGICA DE MÉTODOS (CRUD) ---
+# --- 1. LÓGICA DE VENTAS (NUEVA: CABECERA Y DETALLE) ---
+def gestionar_venta_completa(data, headers):
+    conn = get_connection()
+    try:
+        cab = data.get('cabecera')
+        detalles = data.get('detalles')
+        fecha_auto = datetime.now().strftime('%Y-%m-%d')
 
+        with conn.cursor() as cursor:
+            # Insertar Cabecera
+            sql_cab = "INSERT INTO ventas_online (FECHA, ASESOR, CLIENTE, COMPROBANTE, SALIDA_PEDIDO, REGION, DISTRITO, FORMA_PAGO) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+            cursor.execute(sql_cab, (fecha_auto, cab.get("asesor"), cab.get("cliente"), cab.get("comprobante"), cab.get("salida"), cab.get("region"), cab.get("distrito"), cab.get("forma_pago")))
+            
+            id_venta = cursor.lastrowid # Captura el ID para el detalle
+
+            # Insertar todos los productos del detalle
+            sql_det = "INSERT INTO detalle_ventas (LINEA, CANAL_VENTA, N°_COMPR, CODIGO_PRODUCTO, PRODUCTO, CANTIDAD, UNIDAD_MEDIDA, PRECIO_VENTA, DELIVERY, TOTAL, ID_VENTA, CLASIFICACION, FECHA) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            for it in detalles:
+                cursor.execute(sql_det, (it.get("linea"), it.get("canal"), cab.get("comprobante"), it.get("codigo"), it.get("producto"), it.get("cantidad"), it.get("unidad"), it.get("precio"), it.get("delivery"), it.get("total"), id_venta, it.get("clasificacion"), fecha_auto))
+            
+        conn.commit()
+        return (json.dumps({"success": "Venta registrada con éxito", "id": id_venta}), 200, headers)
+    except Exception as e:
+        conn.rollback()
+        return (json.dumps({"error": f"Fallo en venta: {str(e)}"}), 500, headers)
+    finally:
+        conn.close()
+
+# --- 2. LÓGICA DE CLIENTES (TU CÓDIGO ORIGINAL CRUD) ---
 def extraer(request, headers):
-    """Maneja las peticiones GET para listar o buscar por ID."""
     conn = get_connection()
     id_cliente = request.args.get("id")
-    
     with conn:
         with conn.cursor() as cursor:
             if id_cliente:
-                # Obtener un solo cliente
-                sql = "SELECT * FROM clientes_ventas WHERE ID_CLIENTE = %s"
-                cursor.execute(sql, (id_cliente,))
+                cursor.execute("SELECT * FROM clientes_ventas WHERE ID_CLIENTE = %s", (id_cliente,))
                 result = cursor.fetchone()
             else:
-                # Listar todos los clientes por orden de llegada
-                sql = "SELECT * FROM clientes_ventas ORDER BY ID_CLIENTE DESC"
-                cursor.execute(sql)
+                cursor.execute("SELECT * FROM clientes_ventas ORDER BY ID_CLIENTE DESC")
                 result = cursor.fetchall()
-
     return (json.dumps(result, default=str), 200, headers)
 
-def insertar(request, headers):
-    """Maneja las peticiones POST para registrar nuevos clientes."""
+def insertar_cliente(data, headers):
+    conn = get_connection()
+    fecha_auto = datetime.now().strftime('%Y-%m-%d')
     try:
-        data = request.get_json()
-        if not data:
-            return (json.dumps({"error": "Cuerpo de solicitud vacío"}), 400, headers)
-
-        conn = get_connection()
-        # Generar fecha automática del servidor (YYYY-MM-DD)
-        fecha_auto = datetime.now().strftime('%Y-%m-%d')
-
-        with conn:
-            with conn.cursor() as cursor:
-                sql = """
-                    INSERT INTO clientes_ventas 
-                    (FECHA, CLIENTE, TELEFONO, RUC, DNI, REGION, DISTRITO, TIPO_CLIENTE, CANAL_ORIGEN) 
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """
-                cursor.execute(sql, (
-                    fecha_auto,
-                    data.get("cliente"),
-                    data.get("telefono"),
-                    data.get("ruc"),
-                    data.get("dni"),
-                    data.get("region"),
-                    data.get("distrito"),
-                    data.get("tipo_cliente"),
-                    data.get("canal_origen")
-                ))
-            conn.commit()
-            new_id = cursor.lastrowid
-        
-        return (json.dumps({"success": "Cliente registrado correctamente", "id": new_id}), 200, headers)
+        with conn.cursor() as cursor:
+            sql = "INSERT INTO clientes_ventas (FECHA, CLIENTE, TELEFONO, RUC, DNI, REGION, DISTRITO, TIPO_CLIENTE, CANAL_ORIGEN) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            cursor.execute(sql, (fecha_auto, data.get("cliente"), data.get("telefono"), data.get("ruc"), data.get("dni"), data.get("region"), data.get("distrito"), data.get("tipo_cliente"), data.get("canal_origen")))
+        conn.commit()
+        return (json.dumps({"success": "Cliente registrado", "id": cursor.lastrowid}), 200, headers)
     except Exception as e:
-        logging.error(f"Error en inserción: {str(e)}")
         return (json.dumps({"error": str(e)}), 500, headers)
+    finally:
+        conn.close()
 
-def actualizar(request, headers):
-    """Maneja las peticiones PUT para actualizar datos existentes."""
+def actualizar_cliente(data, headers):
+    conn = get_connection()
     try:
-        data = request.get_json()
-        id_cliente = data.get("id")
-        if not id_cliente:
-            return (json.dumps({"error": "ID de cliente es requerido para actualizar"}), 400, headers)
-
-        conn = get_connection()
-        with conn:
-            with conn.cursor() as cursor:
-                sql = """
-                    UPDATE clientes_ventas 
-                    SET CLIENTE=%s, TELEFONO=%s, RUC=%s, DNI=%s, REGION=%s, 
-                        DISTRITO=%s, TIPO_CLIENTE=%s, CANAL_ORIGEN=%s
-                    WHERE ID_CLIENTE=%s
-                """
-                cursor.execute(sql, (
-                    data.get("cliente"),
-                    data.get("telefono"),
-                    data.get("ruc"),
-                    data.get("dni"),
-                    data.get("region"),
-                    data.get("distrito"),
-                    data.get("tipo_cliente"),
-                    data.get("canal_origen"),
-                    id_cliente
-                ))
-            conn.commit()
-            
-        return (json.dumps({"message": "Datos actualizados correctamente"}), 200, headers)
+        with conn.cursor() as cursor:
+            sql = "UPDATE clientes_ventas SET CLIENTE=%s, TELEFONO=%s, RUC=%s, DNI=%s, REGION=%s, DISTRITO=%s, TIPO_CLIENTE=%s, CANAL_ORIGEN=%s WHERE ID_CLIENTE=%s"
+            cursor.execute(sql, (data.get("cliente"), data.get("telefono"), data.get("ruc"), data.get("dni"), data.get("region"), data.get("distrito"), data.get("tipo_cliente"), data.get("canal_origen"), data.get("id")))
+        conn.commit()
+        return (json.dumps({"message": "Cliente actualizado"}), 200, headers)
     except Exception as e:
-        logging.error(f"Error en actualización: {str(e)}")
         return (json.dumps({"error": str(e)}), 500, headers)
+    finally:
+        conn.close()
 
-# --- PUNTO DE ENTRADA PRINCIPAL ---
-
+# --- 3. PUNTO DE ENTRADA PRINCIPAL (EL CEREBRO) ---
 @functions_framework.http
 def registro_clientes_online(request):
-    """Función principal que orquestra la API con manejo de seguridad y CORS."""
-    
-    # 1. Configuración de Headers CORS
     headers = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'POST, GET, PUT, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     }
-
-    # Responder a pre-vuelo de CORS (necesario para navegadores)
-    if request.method == "OPTIONS":
-        return ("", 204, headers)
+    if request.method == "OPTIONS": return ("", 204, headers)
     
-    # 2. Verificación de Seguridad (Token)
+    # Seguridad
     auth_header = request.headers.get("Authorization")
-    if not auth_header:
-        return (json.dumps({"error": "Acceso denegado: Token no proporcionado"}), 401, headers)
-
+    if not auth_header: return (json.dumps({"error": "No Token"}), 401, headers)
+    
     try:
-        # Validamos el token contra tu API externa de verificación
-        token_headers = {"Content-Type": "application/json", "Authorization": auth_header}
-        resp_auth = requests.post(API_TOKEN_VERIFY, headers=token_headers, timeout=10)
-        
-        if resp_auth.status_code != 200:
-            return (json.dumps({"error": "Token inválido o expirado"}), 401, headers)
-    except Exception as e:
-        logging.error(f"Error verificando token: {str(e)}")
-        return (json.dumps({"error": "Servidor de autenticación no responde"}), 503, headers)
+        resp_auth = requests.post(API_TOKEN_VERIFY, headers={"Authorization": auth_header}, timeout=10)
+        if resp_auth.status_code != 200: return (json.dumps({"error": "Token inválido"}), 401, headers)
+    except: return (json.dumps({"error": "Auth Error"}), 503, headers)
 
-    # 3. Enrutamiento por método HTTP
+    # Enrutamiento
     if request.method == "GET":
         return extraer(request, headers)
+    
     elif request.method == "POST":
-        return insertar(request, headers)
+        data = request.get_json()
+        # Si el JSON trae 'cabecera', el sistema sabe que es el formulario de VENTAS
+        if "cabecera" in data:
+            return gestionar_venta_completa(data, headers)
+        # Si no, sabe que es el formulario original de CLIENTES
+        else:
+            return insertar_cliente(data, headers)
+            
     elif request.method == "PUT":
-        return actualizar(request, headers)
-    else:
-        return (json.dumps({"error": "Método HTTP no permitido"}), 405, headers)
+        return actualizar_cliente(request.get_json(), headers)
+
+    return (json.dumps({"error": "Método no permitido"}), 405, headers)
