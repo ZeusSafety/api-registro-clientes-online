@@ -6,25 +6,25 @@ import json
 import os
 from datetime import datetime
 
-# Variables de Entorno
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_NAME = os.getenv("DB_NAME")
-INSTANCE_CONNECTION_NAME = os.getenv("INSTANCE_CONNECTION_NAME")
-API_TOKEN_VERIFY = "https://api-verificacion-token-2946605267.us-central1.run.app"
-
 # APIs Externas
 API_REGIONES = "https://cotizaciones2026-2946605267.us-central1.run.app/regiones"
 API_DISTRITOS = "https://cotizaciones2026-2946605267.us-central1.run.app/distritos"
+API_TOKEN_VERIFY = "https://api-verificacion-token-2946605267.us-central1.run.app"
 
+# Conexión a MySQL
 def get_connection():
-    return pymysql.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        unix_socket=f"/cloudsql/{INSTANCE_CONNECTION_NAME}",
-        db=DB_NAME,
-        cursorclass=pymysql.cursors.DictCursor,
+    conn = pymysql.connect(
+        user="zeussafety-2024",
+        password="ZeusSafety2025",
+        db="Zeus_Safety_Data_Integration",
+        unix_socket="/cloudsql/stable-smithy-435414-m6:us-central1:zeussafety-2024",
+        cursorclass=pymysql.cursors.DictCursor
     )
+
+    # Para establecer la zona horaria a UTC-5
+    with conn.cursor() as cursor:
+        cursor.execute("SET time_zone = '-05:00'")
+    return conn
 
 def extraer(request, headers):
     conn = get_connection()
@@ -111,7 +111,11 @@ def actualizar(request, headers):
         return (json.dumps({"error": str(e)}), 500, headers)
 
 @functions_framework.http
+<<<<<<< HEAD
 def registro_clientes_online(request):
+=======
+def registro_cliente_on(request):
+>>>>>>> 0d638ad6f407ea8e09ea7f664e5c2588c283c9d6
     # Manejo de CORS
     headers = {
         'Access-Control-Allow-Origin': '*',
