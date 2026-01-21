@@ -35,21 +35,55 @@ def gestionar_venta_completa(data, headers):
         fecha_auto = datetime.now().strftime('%Y-%m-%d')
 
         with conn.cursor() as cursor:
-            # Insertar Cabecera
-            sql_cab = "INSERT INTO ventas_online (FECHA, ASESOR, CLIENTE, COMPROBANTE, SALIDA_PEDIDO, REGION, DISTRITO, FORMA_PAGO) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
-            cursor.execute(sql_cab, (fecha_auto, cab.get("asesor"), cab.get("cliente"), cab.get("comprobante"), cab.get("salida"), cab.get("region"), cab.get("distrito"), cab.get("forma_pago")))
+            # 1. Insertar Cabecera usando el nombre exacto: N°_COMPR
+            sql_cab = """
+                INSERT INTO ventas_online 
+                (FECHA, ASESOR, CLIENTE, `N°_COMPR`, SALIDA_PEDIDO, REGION, DISTRITO, FORMA_PAGO) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            cursor.execute(sql_cab, (
+                fecha_auto, 
+                cab.get("asesor"), 
+                cab.get("cliente"), 
+                cab.get("comprobante"), # El valor viene del JSON, pero se guarda en N°_COMPR
+                cab.get("salida"), 
+                cab.get("region"), 
+                cab.get("distrito"), 
+                cab.get("forma_pago")
+            ))
             
-            id_venta = cursor.lastrowid # Captura el ID para el detalle
+            id_venta = cursor.lastrowid 
 
-            # Insertar todos los productos del detalle
-            sql_det = "INSERT INTO detalle_ventas (LINEA, CANAL_VENTA, N°_COMPR, CODIGO_PRODUCTO, PRODUCTO, CANTIDAD, UNIDAD_MEDIDA, PRECIO_VENTA, DELIVERY, TOTAL, ID_VENTA, CLASIFICACION, FECHA) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            # 2. Insertar Detalles usando el nombre exacto: N°_COMPR
+            sql_det = """
+                INSERT INTO detalle_ventas 
+                (LINEA, CANAL_VENTA, `N°_COMPR`, CODIGO_PRODUCTO, PRODUCTO, CANTIDAD, 
+                 UNIDAD_MEDIDA, PRECIO_VENTA, DELIVERY, TOTAL, ID_VENTA, CLASIFICACION, FECHA) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            
             for it in detalles:
-                cursor.execute(sql_det, (it.get("linea"), it.get("canal"), cab.get("comprobante"), it.get("codigo"), it.get("producto"), it.get("cantidad"), it.get("unidad"), it.get("precio"), it.get("delivery"), it.get("total"), id_venta, it.get("clasificacion"), fecha_auto))
+                cursor.execute(sql_det, (
+                    it.get("linea"), 
+                    it.get("canal"), 
+                    cab.get("comprobante"), 
+                    it.get("codigo"), 
+                    it.get("producto"), 
+                    it.get("cantidad"), 
+                    it.get("unidad"), 
+                    it.get("precio"), 
+                    it.get("delivery"), 
+                    it.get("total"), 
+                    id_venta, 
+                    it.get("clasificacion"), 
+                    fecha_auto
+                ))
             
         conn.commit()
         return (json.dumps({"success": "Venta registrada con éxito", "id": id_venta}), 200, headers)
     except Exception as e:
         conn.rollback()
+        logging.error(f"Error detallado: {str(e)}")
         return (json.dumps({"error": f"Fallo en venta: {str(e)}"}), 500, headers)
     finally:
         conn.close()
