@@ -1,24 +1,21 @@
 # Usar la imagen oficial de Python 3.11 ligera
 FROM python:3.11-slim
 
-# Establecer el directorio de trabajo en el contenedor
+# Establecer el directorio de trabajo
 WORKDIR /workspace
 
-# Copiar el archivo de dependencias primero para aprovechar la caché de Docker
+# Copiar el archivo de dependencias (Asegúrate que el archivo se llame requeriments.txt)
 COPY requeriments.txt .
 
-# Instalar las dependencias necesarias
+# Instalar las dependencias
 RUN pip install --no-cache-dir -r requeriments.txt
 
-# Copiar el código del main.py al contenedor
+# Copiar el código del main.py
 COPY main.py .
 
-# Exponer el puerto 8080 que es el estándar para Google Cloud Run
+# Exponer el puerto 8080 estándar de Cloud Run
 EXPOSE 8080
-
-# Variable de entorno para el puerto
 ENV PORT=8080
 
-# Comando para ejecutar la función usando functions-framework
-# --target=registro_clientes_online indica que esa es la función que debe iniciar
+# COMANDO CORREGIDO: El target debe ser igual al nombre de la función en main.py
 CMD exec functions-framework --target=registro_clientes_online --port=$PORT --host=0.0.0.0
