@@ -20,5 +20,5 @@ EXPOSE 8080
 ENV PORT=8080
 
 # Comando para ejecutar la función usando functions-framework
-# --target=crud_ventas indica que esa es la función que debe iniciar
-CMD exec functions-framework --target=registro-cliente-on --port=$PORT --host=0.0.0.0
+# --target=registro_clientes_online indica que esa es la función que debe iniciar
+CMD exec functions-framework --target=registro_clientes_online --port=$PORT --host=0.0.0.0

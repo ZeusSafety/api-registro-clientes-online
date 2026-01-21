@@ -111,7 +111,7 @@ def actualizar(request, headers):
         return (json.dumps({"error": str(e)}), 500, headers)
 
 @functions_framework.http
-def crud_ventas(request):
+def registro_clientes_online(request):
     # Manejo de CORS
     headers = {
         'Access-Control-Allow-Origin': '*',
