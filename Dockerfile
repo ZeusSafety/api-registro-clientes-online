@@ -1,5 +1,5 @@
 # Usar la imagen oficial de Python 3.11 ligera
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 # Establecer el directorio de trabajo en el contenedor
 WORKDIR /workspace
