@@ -40,23 +40,15 @@ def gestionar_venta_completa(data, headers):
         detalles = data.get('detalles')
         fecha_auto = datetime.now().strftime('%Y-%m-%d')
 
-        def gestionar_venta_completa(data, headers):
-    conn = get_connection()
-    try:
-        cab = data.get('cabecera')
-        detalles = data.get('detalles')
-        fecha_auto = datetime.now().strftime('%Y-%m-%d')
-
         with conn.cursor() as cursor:
-            # --- PASO 1: Obtener ID_CLIENTE (Opción B) ---
+            # 1. Obtener el ID del cliente (Opción B)
             id_cliente_final = cab.get("id_cliente")
-            
             if not id_cliente_final:
                 cursor.execute("SELECT ID_CLIENTE FROM clientes_ventas WHERE CLIENTE = %s", (cab.get("cliente"),))
                 res = cursor.fetchone()
                 id_cliente_final = res['ID_CLIENTE'] if res else None
 
-            # --- PASO 2: Insertar Cabecera ---
+            # 2. Insertar Cabecera (ventas_online)
             primer_item = detalles[0] if detalles else {}
             
             sql_cab = """
@@ -86,10 +78,10 @@ def gestionar_venta_completa(data, headers):
             
             cursor.execute(sql_cab, valores_cab)
             
-            # DEFINICIÓN CRÍTICA: Aquí nace la variable para que no de "not defined"
+            # AQUÍ SE DEFINE EL ID (Esto arregla el error de GCP)
             id_generado = cursor.lastrowid 
 
-            # --- PASO 3: Insertar Detalles ---
+            # 3. Insertar Detalles (detalle_ventas)
             sql_det = """
                 INSERT INTO detalle_ventas 
                 (LINEA, CANAL_VENTA, `N°_COMPR`, CODIGO_PRODUCTO, PRODUCTO, CANTIDAD, 
@@ -99,24 +91,16 @@ def gestionar_venta_completa(data, headers):
             
             for it in detalles:
                 cursor.execute(sql_det, (
-                    it.get("linea"), 
-                    it.get("canal"), 
-                    cab.get("comprobante"), 
-                    it.get("codigo"), 
-                    it.get("producto"), 
-                    it.get("cantidad"), 
-                    it.get("unidad"), 
-                    it.get("precio"), 
-                    it.get("delivery"), 
+                    it.get("linea"), it.get("canal"), cab.get("comprobante"), 
+                    it.get("codigo"), it.get("producto"), it.get("cantidad"), 
+                    it.get("unidad"), it.get("precio"), it.get("delivery"), 
                     it.get("total"), 
-                    id_generado, # <--- Aquí ya está definida y no fallará
-                    it.get("clasificacion"), 
-                    fecha_auto
+                    id_generado, # Se usa la variable recién definida
+                    it.get("clasificacion"), fecha_auto
                 ))
             
         conn.commit()
         return (json.dumps({"success": "Venta registrada", "id_venta": id_generado}), 200, headers)
-        
     except Exception as e:
         if conn: conn.rollback()
         logging.error(f"Error en Venta: {str(e)}")
