@@ -40,10 +40,12 @@ def extraer(request, headers):
     with conn:
         with conn.cursor() as cursor:
             if id_cliente:
+                # Obtener un solo cliente
                 sql = "SELECT * FROM clientes_ventas WHERE ID_CLIENTE = %s"
                 cursor.execute(sql, (id_cliente,))
                 result = cursor.fetchone()
             else:
+                # Listar todos los clientes por orden de llegada
                 sql = "SELECT * FROM clientes_ventas ORDER BY ID_CLIENTE DESC"
                 cursor.execute(sql)
                 result = cursor.fetchall()
@@ -126,16 +128,16 @@ def actualizar(request, headers):
 
 @functions_framework.http
 def registro_clientes_online(request):
-    """Función principal que orquestra la API."""
+    """Función principal que orquestra la API con manejo de seguridad y CORS."""
     
-    # 1. Configuración de CORS
+    # 1. Configuración de Headers CORS
     headers = {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'POST, GET, PUT, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     }
 
-    # Responder a pre-vuelo de CORS
+    # Responder a pre-vuelo de CORS (necesario para navegadores)
     if request.method == "OPTIONS":
         return ("", 204, headers)
     
@@ -145,7 +147,7 @@ def registro_clientes_online(request):
         return (json.dumps({"error": "Acceso denegado: Token no proporcionado"}), 401, headers)
 
     try:
-        # Validamos el token contra tu API de verificación
+        # Validamos el token contra tu API externa de verificación
         token_headers = {"Content-Type": "application/json", "Authorization": auth_header}
         resp_auth = requests.post(API_TOKEN_VERIFY, headers=token_headers, timeout=10)
         
