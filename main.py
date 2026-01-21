@@ -34,7 +34,6 @@ def get_connection():
 # --- 1. LÓGICA DE VENTAS (MAESTRO-DETALLE) ---
 
 def gestionar_venta_completa(data, headers):
-    """Procesa Cabecera y Detalle con el orden de columnas de tus imágenes."""
     conn = get_connection()
     try:
         cab = data.get('cabecera')
@@ -42,9 +41,8 @@ def gestionar_venta_completa(data, headers):
         fecha_auto = datetime.now().strftime('%Y-%m-%d')
 
         with conn.cursor() as cursor:
-            # INSERTAR CABECERA: Orden corregido para que FECHA no reciba 'CALLAO'
-            # Orden basado en tus capturas: ASESOR, CLIENTE, TIPO_COMPROBANTE, N°_COMPR, FECHA...
-            # INSERT CON MAPEO EXPLÍCITO (Evita el error 1292 de columna de fecha)
+            # 1. INSERTAR CABECERA
+            # Usamos `N°_COMPR` con comillas invertidas porque tiene un carácter especial
             sql_cab = """
                 INSERT INTO ventas_online 
                 (ASESOR, CLIENTE, TIPO_COMPROBANTE, `N°_COMPR`, FECHA, REGION, DISTRITO, FORMA_DE_PAGO, SALIDA_DE_PEDIDO) 
@@ -64,8 +62,12 @@ def gestionar_venta_completa(data, headers):
             }
             
             cursor.execute(sql_cab, valores_cab)
+            
+            # Obtenemos el ID generado por MySQL
+            id_generado = cursor.lastrowid 
 
-            # INSERTAR DETALLES
+            # 2. INSERTAR DETALLES
+            # IMPORTANTE: La columna se llama ID_VENTA (según tu imagen image_b76efc.png)
             sql_det = """
                 INSERT INTO detalle_ventas 
                 (LINEA, CANAL_VENTA, `N°_COMPR`, CODIGO_PRODUCTO, PRODUCTO, CANTIDAD, 
@@ -85,13 +87,13 @@ def gestionar_venta_completa(data, headers):
                     it.get("precio"), 
                     it.get("delivery"), 
                     it.get("total"), 
-                    id_venta_generado, 
+                    id_generado, # Se vincula con ID_VENTA
                     it.get("clasificacion"), 
                     fecha_auto
                 ))
             
         conn.commit()
-        return (json.dumps({"success": "Venta registrada correctamente", "id": id_venta_generado}), 200, headers)
+        return (json.dumps({"success": "Venta registrada", "id": id_generado}), 200, headers)
     except Exception as e:
         if conn: conn.rollback()
         logging.error(f"Error en Venta: {str(e)}")
