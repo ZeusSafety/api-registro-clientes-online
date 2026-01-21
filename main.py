@@ -41,21 +41,32 @@ def gestionar_venta_completa(data, headers):
         fecha_auto = datetime.now().strftime('%Y-%m-%d')
 
         with conn.cursor() as cursor:
-            # 1. INSERTAR CABECERA (Ahora incluyendo los 3 campos faltantes)
+            # --- PASO 1: Obtener ID_CLIENTE (Opción B) ---
+            # Priorizamos el ID que viene del formulario
+            id_cliente_final = cab.get("id_cliente")
+            
+            # Si por alguna razón no viene el ID, lo buscamos por nombre como respaldo
+            if not id_cliente_final:
+                cursor.execute("SELECT ID_CLIENTE FROM clientes_ventas WHERE CLIENTE = %s", (cab.get("cliente"),))
+                res = cursor.fetchone()
+                id_cliente_final = res['ID_CLIENTE'] if res else None
+
+            # --- PASO 2: Insertar Cabecera en ventas_online ---
+            # Extraemos los campos de marketing del primer detalle para llenar la cabecera
+            primer_item = detalles[0] if detalles else {}
+            
             sql_cab = """
                 INSERT INTO ventas_online 
-                (ASESOR, CLIENTE, TIPO_COMPROBANTE, `N°_COMPR`, FECHA, REGION, DISTRITO, 
+                (ASESOR, ID_CLIENTE, CLIENTE, TIPO_COMPROBANTE, `N°_COMPR`, FECHA, REGION, DISTRITO, 
                  FORMA_DE_PAGO, SALIDA_DE_PEDIDO, LINEA, CANAL_VENTA, CLASIFICACION) 
-                VALUES (%(asesor)s, %(cliente)s, %(tipo_comprobante)s, %(comprobante)s, 
+                VALUES (%(asesor)s, %(id_cliente)s, %(cliente)s, %(tipo_comprobante)s, %(comprobante)s, 
                         %(fecha)s, %(region)s, %(distrito)s, %(forma_pago)s, %(salida)s,
                         %(linea)s, %(canal)s, %(clasificacion)s)
             """
             
-            # Sacamos LINEA, CANAL y CLASIFICACION del primer elemento de los detalles
-            primer_detalle = detalles[0] if detalles else {}
-
             valores_cab = {
                 "asesor": cab.get("asesor"),
+                "id_cliente": id_cliente_final, # Vinculación con la tabla clientes
                 "cliente": cab.get("cliente"),
                 "tipo_comprobante": cab.get("tipo_comprobante"),
                 "comprobante": cab.get("comprobante"),
@@ -64,14 +75,13 @@ def gestionar_venta_completa(data, headers):
                 "distrito": cab.get("distrito"),
                 "forma_pago": cab.get("forma_pago"),
                 "salida": cab.get("salida"),
-                # Agregamos estos 3:
-                "linea": primer_detalle.get("linea"),
-                "canal": primer_detalle.get("canal"),
-                "clasificacion": primer_detalle.get("clasificacion")
+                "linea": primer_item.get("linea"),
+                "canal": primer_item.get("canal"),
+                "clasificacion": primer_item.get("clasificacion")
             }
             
             cursor.execute(sql_cab, valores_cab)
-            id_generado = cursor.lastrowid
+            id_venta_generado = cursor.lastrowid
 
             # 2. INSERTAR DETALLES
             # IMPORTANTE: La columna se llama ID_VENTA (según tu imagen image_b76efc.png)
