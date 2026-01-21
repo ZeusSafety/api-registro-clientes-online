@@ -35,29 +35,30 @@ def gestionar_venta_completa(data, headers):
         fecha_auto = datetime.now().strftime('%Y-%m-%d')
 
         with conn.cursor() as cursor:
-            # 1. INSERTAR CABECERA (Tabla: ventas_online)
-            # He mapeado los nombres EXACTOS de tu imagen: SALIDA_DE_PEDIDO, FORMA_DE_PAGO, etc.
+            # 1. INSERTAR CABECERA (ventas_online)
+            # He reordenado las columnas según el encabezado de tu imagen image_b76efc.png y image_b76f1a.png
+            # El orden es: ASESOR, CLIENTE, TIPO_COMPROBANTE, N°_COMPR, FECHA, REGION, DISTRITO, FORMA_DE_PAGO, SALIDA_DE_PEDIDO
             sql_cab = """
                 INSERT INTO ventas_online 
-                (FECHA, ASESOR, CLIENTE, TIPO_COMPROBANTE, `N°_COMPR`, REGION, DISTRITO, FORMA_DE_PAGO, SALIDA_DE_PEDIDO) 
+                (ASESOR, CLIENTE, TIPO_COMPROBANTE, `N°_COMPR`, FECHA, REGION, DISTRITO, FORMA_DE_PAGO, SALIDA_DE_PEDIDO) 
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             cursor.execute(sql_cab, (
-                fecha_auto, 
                 cab.get("asesor"), 
                 cab.get("cliente"), 
-                cab.get("tipo_comprobante"), # Añadido según tu imagen
+                cab.get("tipo_comprobante"), 
                 cab.get("comprobante"), 
+                fecha_auto, # La fecha va en la 5ta posición según tu tabla
                 cab.get("region"), 
                 cab.get("distrito"), 
                 cab.get("forma_pago"),
-                cab.get("salida")
+                cab.get("salida") # 'CALLAO' ahora caerá en un campo VARCHAR/TEXTO, no en FECHA
             ))
             
             id_venta_generado = cursor.lastrowid 
 
-            # 2. INSERTAR DETALLES (Tabla: detalle_ventas)
-            # Ajustado: N°_COMPR, CANAL_VENTA, etc.
+            # 2. INSERTAR DETALLES (detalle_ventas)
+            # Basado en la imagen image_b8c478.png
             sql_det = """
                 INSERT INTO detalle_ventas 
                 (LINEA, CANAL_VENTA, `N°_COMPR`, CODIGO_PRODUCTO, PRODUCTO, CANTIDAD, 
@@ -87,7 +88,6 @@ def gestionar_venta_completa(data, headers):
     except Exception as e:
         conn.rollback()
         logging.error(f"Error detallado: {str(e)}")
-        # Te devuelvo el error exacto para que sigamos debugueando si algo falta
         return (json.dumps({"error": f"Fallo en venta: {str(e)}"}), 500, headers)
     finally:
         conn.close()
