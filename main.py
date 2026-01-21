@@ -44,58 +44,26 @@ def gestionar_venta_completa(data, headers):
         with conn.cursor() as cursor:
             # INSERTAR CABECERA: Orden corregido para que FECHA no reciba 'CALLAO'
             # Orden basado en tus capturas: ASESOR, CLIENTE, TIPO_COMPROBANTE, N°_COMPR, FECHA...
+            # INSERT CON MAPEO EXPLÍCITO (Evita el error 1292 de columna de fecha)
             sql_cab = """
                 INSERT INTO ventas_online 
                 (ASESOR, CLIENTE, TIPO_COMPROBANTE, `N°_COMPR`, FECHA, REGION, DISTRITO, FORMA_DE_PAGO, SALIDA_DE_PEDIDO) 
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """
-            cursor.execute(sql_cab, (
-                cab.get("asesor"), 
-                cab.get("cliente"), 
-                cab.get("tipo_comprobante"), 
-                cab.get("comprobante"), 
-                fecha_auto, 
-                cab.get("region"), 
-                cab.get("distrito"), 
-                cab.get("forma_pago"),
-                cab.get("salida") 
-            ))
-            
-            id_venta_generado = cursor.lastrowid 
-
-            # INSERTAR DETALLES
-            sql_det = """
-                INSERT INTO detalle_ventas 
-                (LINEA, CANAL_VENTA, `N°_COMPR`, CODIGO_PRODUCTO, PRODUCTO, CANTIDAD, 
-                 UNIDAD_MEDIDA, PRECIO_VENTA, DELIVERY, TOTAL, ID_VENTA, CLASIFICACION, FECHA) 
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%(asesor)s, %(cliente)s, %(tipo_comprobante)s, %(comprobante)s, %(fecha)s, %(region)s, %(distrito)s, %(forma_pago)s, %(salida)s)
             """
             
-            for it in detalles:
-                cursor.execute(sql_det, (
-                    it.get("linea"), 
-                    it.get("canal"), 
-                    cab.get("comprobante"), 
-                    it.get("codigo"), 
-                    it.get("producto"), 
-                    it.get("cantidad"), 
-                    it.get("unidad"), 
-                    it.get("precio"), 
-                    it.get("delivery"), 
-                    it.get("total"), 
-                    id_venta_generado, 
-                    it.get("clasificacion"), 
-                    fecha_auto
-                ))
+            valores_cab = {
+                "asesor": cab.get("asesor"),
+                "cliente": cab.get("cliente"),
+                "tipo_comprobante": cab.get("tipo_comprobante"),
+                "comprobante": cab.get("comprobante"),
+                "fecha": fecha_auto,
+                "region": cab.get("region"),
+                "distrito": cab.get("distrito"),
+                "forma_pago": cab.get("forma_pago"),
+                "salida": cab.get("salida")
+            }
             
-        conn.commit()
-        return (json.dumps({"success": "Venta registrada correctamente", "id": id_venta_generado}), 200, headers)
-    except Exception as e:
-        if conn: conn.rollback()
-        logging.error(f"Error en Venta: {str(e)}")
-        return (json.dumps({"error": f"Fallo en venta: {str(e)}"}), 500, headers)
-    finally:
-        if conn: conn.close()
+            cursor.execute(sql_cab, valores_cab)
 
 # --- 2. LÓGICA DE CLIENTES (CRUD ORIGINAL) ---
 
