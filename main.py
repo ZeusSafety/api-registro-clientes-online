@@ -35,26 +35,29 @@ def gestionar_venta_completa(data, headers):
         fecha_auto = datetime.now().strftime('%Y-%m-%d')
 
         with conn.cursor() as cursor:
-            # 1. Insertar Cabecera usando el nombre exacto: N°_COMPR
+            # 1. INSERTAR CABECERA (Tabla: ventas_online)
+            # He mapeado los nombres EXACTOS de tu imagen: SALIDA_DE_PEDIDO, FORMA_DE_PAGO, etc.
             sql_cab = """
                 INSERT INTO ventas_online 
-                (FECHA, ASESOR, CLIENTE, `N°_COMPR`, SALIDA_PEDIDO, REGION, DISTRITO, FORMA_PAGO) 
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                (FECHA, ASESOR, CLIENTE, TIPO_COMPROBANTE, `N°_COMPR`, REGION, DISTRITO, FORMA_DE_PAGO, SALIDA_DE_PEDIDO) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             cursor.execute(sql_cab, (
                 fecha_auto, 
                 cab.get("asesor"), 
                 cab.get("cliente"), 
-                cab.get("comprobante"), # El valor viene del JSON, pero se guarda en N°_COMPR
-                cab.get("salida"), 
+                cab.get("tipo_comprobante"), # Añadido según tu imagen
+                cab.get("comprobante"), 
                 cab.get("region"), 
                 cab.get("distrito"), 
-                cab.get("forma_pago")
+                cab.get("forma_pago"),
+                cab.get("salida")
             ))
             
-            id_venta = cursor.lastrowid 
+            id_venta_generado = cursor.lastrowid 
 
-            # 2. Insertar Detalles usando el nombre exacto: N°_COMPR
+            # 2. INSERTAR DETALLES (Tabla: detalle_ventas)
+            # Ajustado: N°_COMPR, CANAL_VENTA, etc.
             sql_det = """
                 INSERT INTO detalle_ventas 
                 (LINEA, CANAL_VENTA, `N°_COMPR`, CODIGO_PRODUCTO, PRODUCTO, CANTIDAD, 
@@ -74,16 +77,17 @@ def gestionar_venta_completa(data, headers):
                     it.get("precio"), 
                     it.get("delivery"), 
                     it.get("total"), 
-                    id_venta, 
+                    id_venta_generado, 
                     it.get("clasificacion"), 
                     fecha_auto
                 ))
             
         conn.commit()
-        return (json.dumps({"success": "Venta registrada con éxito", "id": id_venta}), 200, headers)
+        return (json.dumps({"success": "Venta registrada con éxito", "id": id_venta_generado}), 200, headers)
     except Exception as e:
         conn.rollback()
         logging.error(f"Error detallado: {str(e)}")
+        # Te devuelvo el error exacto para que sigamos debugueando si algo falta
         return (json.dumps({"error": f"Fallo en venta: {str(e)}"}), 500, headers)
     finally:
         conn.close()
