@@ -40,19 +40,23 @@ def gestionar_venta_completa(data, headers):
         detalles = data.get('detalles')
         fecha_auto = datetime.now().strftime('%Y-%m-%d')
 
+        def gestionar_venta_completa(data, headers):
+    conn = get_connection()
+    try:
+        cab = data.get('cabecera')
+        detalles = data.get('detalles')
+        fecha_auto = datetime.now().strftime('%Y-%m-%d')
+
         with conn.cursor() as cursor:
             # --- PASO 1: Obtener ID_CLIENTE (Opción B) ---
-            # Priorizamos el ID que viene del formulario
             id_cliente_final = cab.get("id_cliente")
             
-            # Si por alguna razón no viene el ID, lo buscamos por nombre como respaldo
             if not id_cliente_final:
                 cursor.execute("SELECT ID_CLIENTE FROM clientes_ventas WHERE CLIENTE = %s", (cab.get("cliente"),))
                 res = cursor.fetchone()
                 id_cliente_final = res['ID_CLIENTE'] if res else None
 
-            # --- PASO 2: Insertar Cabecera en ventas_online ---
-            # Extraemos los campos de marketing del primer detalle para llenar la cabecera
+            # --- PASO 2: Insertar Cabecera ---
             primer_item = detalles[0] if detalles else {}
             
             sql_cab = """
@@ -66,7 +70,7 @@ def gestionar_venta_completa(data, headers):
             
             valores_cab = {
                 "asesor": cab.get("asesor"),
-                "id_cliente": id_cliente_final, # Vinculación con la tabla clientes
+                "id_cliente": id_cliente_final,
                 "cliente": cab.get("cliente"),
                 "tipo_comprobante": cab.get("tipo_comprobante"),
                 "comprobante": cab.get("comprobante"),
@@ -81,10 +85,11 @@ def gestionar_venta_completa(data, headers):
             }
             
             cursor.execute(sql_cab, valores_cab)
-            id_venta_generado = cursor.lastrowid
+            
+            # DEFINICIÓN CRÍTICA: Aquí nace la variable para que no de "not defined"
+            id_generado = cursor.lastrowid 
 
-            # 2. INSERTAR DETALLES
-            # IMPORTANTE: La columna se llama ID_VENTA (según tu imagen image_b76efc.png)
+            # --- PASO 3: Insertar Detalles ---
             sql_det = """
                 INSERT INTO detalle_ventas 
                 (LINEA, CANAL_VENTA, `N°_COMPR`, CODIGO_PRODUCTO, PRODUCTO, CANTIDAD, 
@@ -104,13 +109,14 @@ def gestionar_venta_completa(data, headers):
                     it.get("precio"), 
                     it.get("delivery"), 
                     it.get("total"), 
-                    id_generado, # Se vincula con ID_VENTA
+                    id_generado, # <--- Aquí ya está definida y no fallará
                     it.get("clasificacion"), 
                     fecha_auto
                 ))
             
         conn.commit()
-        return (json.dumps({"success": "Venta registrada", "id": id_generado}), 200, headers)
+        return (json.dumps({"success": "Venta registrada", "id_venta": id_generado}), 200, headers)
+        
     except Exception as e:
         if conn: conn.rollback()
         logging.error(f"Error en Venta: {str(e)}")
